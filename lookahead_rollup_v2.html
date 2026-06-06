@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Paragon – Look-Ahead Roll-Up</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --purple:   #29166F;
+    --purple2:  #3d22a0;
+    --purple-lt:#ede9f8;
+    --green:    #85C227;
+    --green-dk: #6aa01e;
+    --green-lt: #f3f9e8;
+    --white:    #FFFFFF;
+    --bg-soft:  #F3F7EB;
+    --gray:     #B9BEB7;
+    --gray-lt:  #e8ecea;
+    --gray-dk:  #6b7280;
+    --text:     #1a1a2e;
+    --text-sub: #4b5563;
+    --red:      #c0392b;
+    --red-lt:   #fdf2f1;
+    --mono:     'JetBrains Mono', 'Courier New', Courier, monospace;
+    --cond:     'Barlow Condensed', Arial Narrow, Arial, sans-serif;
+    --body:     'Barlow', Arial, Helvetica, sans-serif;
+    --radius:   6px;
+    --shadow:   0 1px 4px rgba(41,22,111,.08), 0 4px 16px rgba(41,22,111,.06);
+    --shadow-sm:0 1px 3px rgba(41,22,111,.1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--bg-soft);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--purple);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(41,22,111,.25);
+  }
+
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: var(--green);
+    clip-path: polygon(0 0, 100% 0, 100% 68%, 68% 100%, 0 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--cond);
+    font-weight: 700; font-size: 16px;
+    color: var(--purple);
+    flex-shrink: 0;
+  }
+
+  .header-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  header h1 {
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1;
+  }
+
+  .header-sub {
+    font-family: var(--cond);
+    font-size: 11px;
+    color: rgba(255,255,255,.55);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .header-badge {
+    margin-left: auto;
+    font-family: var(--cond);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--green);
+    background: rgba(133,194,39,.12);
+    border: 1px solid rgba(133,194,39,.25);
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 600px) {
+    .header-badge { display: none; }
+    header { padding: 0 16px; }
+  }
+
+  /* ── Layout ── */
+  .app-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (max-width: 860px) {
+    .app-body {
+      grid-template-columns: 1fr;
+      overflow: visible;
+    }
+  }
+
+  /* ── Left Panel ── */
+  .left-panel {
+    background: var(--white);
+    border-right: 1px solid var(--gray-lt);
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    min-width: 0;
+  }
+
+  @media (max-width: 860px) {
+    .left-panel {
+      border-right: none;
+      border-bottom: 2px solid var(--purple-lt);
+      overflow-y: visible;
+    }
+  }
+
+  .section-label {
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--purple-lt);
+  }
+
+  /* Drop Zone */
+  .drop-zone {
+    border: 2px dashed var(--gray-lt);
+    border-radius: var(--radius);
+    padding: 24px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    background: var(--bg-soft);
+  }
+
+  .drop-zone:hover, .drop-zone.dragging {
+    border-color: var(--green);
+    background: var(--green-lt);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+
+  .drop-zone p {
+    font-size: 12px;
+    color: var(--gray-dk);
+    line-height: 1.5;
+  }
+
+  .drop-zone strong { color: var(--purple); font-weight: 600; }
+
+  /* Cloud Load */
+  .cloud-block {
+    background: var(--purple-lt);
+    border: 1px solid #c7bef0;
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cloud-block label { font-size: 12px; font-weight: 600; color: var(--purple); }
+  .cloud-block input[type=date] {
+    width: 100%; border: 1px solid #c7bef0; border-radius: var(--radius);
+    padding: 5px 8px; font-size: 12px; font-family: var(--body);
+    color: var(--text); background: var(--white);
+  }
+  .btn-cloud {
+    background: var(--purple); color: var(--white);
+    border: none; border-radius: var(--radius);
+    padding: 7px 10px; font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--body); letter-spacing: .3px;
+    transition: background .15s;
+  }
+  .btn-cloud:hover { background: var(--purple2); }
+  .btn-cloud:disabled { background: var(--gray); cursor: default; }
+
+  /* File list */
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .file-list::-webkit-scrollbar { width: 3px; }
+  .file-list::-webkit-scrollbar-thumb { background: var(--gray-lt); border-radius: 2px; }
+
+  .file-item {
+    background: var(--bg-soft);
+    border: 1px solid var(--gray-lt);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .fi-name {
+    flex: 1;
+    font-family: var(--mono);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .fi-status {
+    font-size: 9px;
+    font-family: var(--cond);
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .fi-status.pending  { background: var(--gray-lt);   color: var(--gray-dk); }
+  .fi-status.parsed   { background: var(--green-lt);  color: var(--green-dk); }
+  .fi-status.error    { background: var(--red-lt);    color: var(--red); }
+
+  .fi-remove {
+    background: none; border: none; color: var(--gray);
+    cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px;
+    transition: color .15s; flex-shrink: 0;
+  }
+  .fi-remove:hover { color: var(--red); }
+
+  /* Options */
+  .options-block { display: flex; flex-direction: column; gap: 10px; }
+
+  .opt-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .opt-row label {
+    font-size: 12px;
+    color: var(--text-sub);
+    flex: 1;
+    padding-top: 6px;
+    line-height: 1.4;
+  }
+
+  .opt-row input[type=text] {
+    background: var(--bg-soft);
+    border: 1px solid var(--gray-lt);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family: var(--mono);
+    width: 120px;
+    flex-shrink: 0;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .opt-row input[type=text]:focus {
+    border-color: var(--purple);
+    background: var(--white);
+  }
+
+  /* Generate Button */
+  .btn-generate {
+    background: var(--green);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    padding: 13px 18px;
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .2s, transform .1s, box-shadow .2s;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(133,194,39,.3);
+    margin-top: auto;
+  }
+
+  .btn-generate:hover:not(:disabled) {
+    background: var(--green-dk);
+    box-shadow: 0 4px 12px rgba(133,194,39,.4);
+  }
+
+  .btn-generate:active:not(:disabled) { transform: scale(.98); }
+  .btn-generate:disabled { opacity: .35; cursor: not-allowed; box-shadow: none; }
+
+  /* ── Right Panel ── */
+  .right-panel {
+    padding: 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  @media (max-width: 860px) {
+    .right-panel {
+      overflow-y: visible;
+      padding: 16px;
+    }
+  }
+
+  /* Stats */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 640px) {
+    .summary-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .stat-card {
+    background: var(--white);
+    border: 1px solid var(--gray-lt);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+    border-top: 3px solid var(--purple);
+  }
+
+  .sc-val {
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--purple);
+    line-height: 1;
+  }
+
+  .sc-lbl {
+    font-size: 10px;
+    color: var(--gray-dk);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  /* Preview */
+  .preview-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .preview-header h2 {
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--purple);
+  }
+
+  .tab-switcher { display: flex; gap: 4px; }
+
+  .tab-btn {
+    background: var(--gray-lt);
+    border: none;
+    color: var(--gray-dk);
+    padding: 5px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--cond);
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+
+  .tab-btn.active {
+    background: var(--purple);
+    color: var(--white);
+  }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 260px;
+    max-height: clamp(280px, calc(100vh - 320px), 650px);
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-lt);
+    background: var(--white);
+    box-shadow: var(--shadow-sm);
+    width: 100%;
+  }
+
+  @media (max-width: 860px) {
+    .table-wrap {
+      max-height: 480px;
+    }
+  }
+
+  .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: var(--bg-soft); }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--gray-lt); border-radius: 3px; }
+
+  table {
+    border-collapse: collapse;
+    font-size: 11px;
+    width: 100%;
+    min-width: max-content;
+  }
+
+  thead tr {
+    background: var(--purple);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  thead th {
+    padding: 8px 10px;
+    text-align: left;
+    font-family: var(--cond);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.85);
+    white-space: nowrap;
+    border-right: 1px solid rgba(255,255,255,.08);
+  }
+
+  thead th:last-child { border-right: none; }
+  thead th.date-col { color: var(--green); text-align: center; }
+
+  tbody tr { border-bottom: 1px solid var(--gray-lt); }
+  tbody tr:nth-child(even) { background: var(--bg-soft); }
+  tbody tr:hover { background: var(--purple-lt); }
+
+  tbody tr.section-header { background: var(--purple-lt); }
+  tbody tr.section-header:hover { background: var(--purple-lt); }
+
+  tbody tr.section-header td {
+    font-family: var(--cond);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--purple);
+    padding: 7px 10px;
+    border-top: 1px solid var(--purple-lt);
+  }
+
+  tbody tr.summary-row-tr { background: var(--bg-soft); }
+  tbody tr.summary-row-tr:hover { background: var(--gray-lt); }
+
+  tbody tr.summary-row-tr td {
+    font-family: var(--cond);
+    font-weight: 600;
+    font-size: 10px;
+    color: var(--text-sub);
+    padding: 5px 10px;
+    border-top: 1px solid var(--gray-lt);
+  }
+
+  td {
+    padding: 5px 10px;
+    color: var(--text);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  td.date-val { text-align: center; font-family: var(--mono); font-size: 10px; color: var(--text-sub); }
+  td.num-val  { text-align: center; font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--purple); }
+  td.neg-val  { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--red); font-weight: 600; }
+  td.pos-val  { text-align: center; font-family: var(--mono); font-size: 11px; color: var(--green-dk); font-weight: 600; }
+  td.sched-dot { text-align: center; color: var(--green); font-size: 10px; }
+
+  .job-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--purple-lt);
+    border-radius: 3px;
+    padding: 2px 6px;
+    color: var(--purple);
+    display: inline-block;
+    font-weight: 500;
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 260px;
+    gap: 12px;
+    color: var(--gray);
+  }
+
+  .es-icon { font-size: 42px; opacity: .5; }
+
+  .empty-state p {
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.6;
+    color: var(--gray-dk);
+  }
+
+  /* Log */
+  .log-wrap { flex-shrink: 0; }
+
+  .log-area {
+    background: var(--white);
+    border: 1px solid var(--gray-lt);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--gray-dk);
+    max-height: 90px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+
+  .log-area .log-ok   { color: var(--green-dk); }
+  .log-area .log-warn { color: #d97706; }
+  .log-area .log-err  { color: var(--red); }
+
+  [title] { cursor: help; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">P</div>
+  <div class="header-titles">
+    <h1>Look-Ahead Roll-Up</h1>
+    <div class="header-sub">Field Schedule Consolidation</div>
+  </div>
+  <div class="header-badge">Paragon Contractors</div>
+</header>
+
+<div class="app-body">
+
+  <!-- LEFT PANEL -->
+  <aside class="left-panel">
+
+    <div class="cloud-block">
+      <label>☁ Load from Cloud (all supers)</label>
+      <input type="date" id="cloudWeek" title="Select any date — tool locks to Monday">
+      <button class="btn-cloud" id="btnCloud">☁ Load All Supers</button>
+    </div>
+
+    <div>
+      <div class="section-label">— or — Step 1 — Load Files</div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" multiple accept=".xlsx,.xls">
+        <span class="drop-icon">📂</span>
+        <p>Drop look-ahead <strong>.xlsx</strong> files here<br>or tap to browse<br>
+        <small style="color:var(--gray);font-size:10px">(one file per superintendent)</small></p>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Loaded Files</div>
+      <div class="file-list" id="fileList">
+        <div style="font-size:11px;color:var(--gray);font-style:italic;padding:4px 2px">No files loaded yet</div>
+      </div>
+    </div>
+
+    <div class="options-block">
+      <div class="section-label">Step 2 — Options</div>
+      <div class="opt-row">
+        <label>Sheet name<br><small style="color:var(--gray);font-size:10px">blank = auto-detect</small></label>
+        <input type="text" id="optSheet" placeholder="auto" value="">
+      </div>
+      <div class="opt-row">
+        <label>Output filename</label>
+        <input type="text" id="optFilename" placeholder="rollup.xlsx" value="Paragon_LookAhead_Rollup">
+      </div>
+    </div>
+
+    <button class="btn-generate" id="btnGenerate" disabled>
+      ⬇ Generate Excel Roll-Up
+    </button>
+
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <section class="right-panel">
+
+    <div class="summary-row" id="summaryRow">
+      <div class="stat-card"><div class="sc-val" id="statFiles">0</div><div class="sc-lbl">Files Loaded</div></div>
+      <div class="stat-card"><div class="sc-val" id="statJobs">0</div><div class="sc-lbl">Jobs</div></div>
+      <div class="stat-card"><div class="sc-val" id="statActivities">0</div><div class="sc-lbl">Activities</div></div>
+      <div class="stat-card"><div class="sc-val" id="statWeeks">0</div><div class="sc-lbl">Date Span (wks)</div></div>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-header">
+        <h2>Preview</h2>
+        <div class="tab-switcher">
+          <button class="tab-btn active" data-tab="flat">Flat List</button>
+          <button class="tab-btn" data-tab="byjob">By Job</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="tableWrap">
+        <div class="empty-state">
+          <div class="es-icon">📋</div>
+          <p>Load field look-ahead files to preview<br>the combined roll-up here.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-wrap">
+      <div class="section-label">Parse Log</div>
+      <div class="log-area" id="logArea"><span style="color:var(--gray)">Waiting for files…</span></div>
+    </div>
+
+  </section>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+const state = {
+  files: [],
+  parsedJobs: [],
+  allDates: [],
+  activeTab: 'flat'
+};
+
+// ══════════════════════════════════════════════════════
+//  DOM REFS
+// ══════════════════════════════════════════════════════
+const dropZone   = document.getElementById('dropZone');
+const fileInput  = document.getElementById('fileInput');
+const fileList   = document.getElementById('fileList');
+const btnGen     = document.getElementById('btnGenerate');
+const logArea    = document.getElementById('logArea');
+const tableWrap  = document.getElementById('tableWrap');
+const statFiles  = document.getElementById('statFiles');
+const statJobs   = document.getElementById('statJobs');
+const statActs   = document.getElementById('statActivities');
+const statWeeks  = document.getElementById('statWeeks');
+
+// ══════════════════════════════════════════════════════
+//  FILE DRAG / INPUT
+// ══════════════════════════════════════════════════════
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragging'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragging');
+  handleFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => { handleFiles([...fileInput.files]); fileInput.value = ''; });
+
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+  state.activeTab = b.dataset.tab;
+  document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  renderPreview();
+}));
+
+// ══════════════════════════════════════════════════════
+//  HANDLE FILE LOAD
+// ══════════════════════════════════════════════════════
+function handleFiles(incoming) {
+  incoming.forEach(f => {
+    if (!f.name.match(/\.xlsx?$/i)) { log(`Skipped non-Excel file: ${f.name}`, 'warn'); return; }
+    if (state.files.find(x => x.name === f.name)) { log(`Already loaded: ${f.name}`, 'warn'); return; }
+    const entry = { file: f, name: f.name, status: 'pending', data: null };
+    state.files.push(entry);
+    renderFileList();
+    readAndParse(entry);
+  });
+}
+
+function removeFile(name) {
+  state.files = state.files.filter(f => f.name !== name);
+  state.parsedJobs = state.parsedJobs.filter(j => j.fileName !== name);
+  rebuildDates();
+  renderFileList();
+  renderPreview();
+  updateStats();
+}
+
+// ══════════════════════════════════════════════════════
+//  PARSE EXCEL
+// ══════════════════════════════════════════════════════
+function readAndParse(entry) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const sheetPref = document.getElementById('optSheet').value.trim();
+      const sheet = detectSheet(wb, sheetPref, entry.name);
+      if (!sheet) { entry.status = 'error'; log(`No parseable look-ahead sheet found in: ${entry.name}`, 'err'); renderFileList(); return; }
+
+      const ws = wb.Sheets[sheet];
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: false, dateNF: 'yyyy-mm-dd' });
+      const parsed = parseLookAhead(raw, entry.name, sheet);
+
+      if (!parsed || parsed.activities.length === 0) {
+        entry.status = 'error';
+        log(`No activity rows extracted from "${sheet}" in ${entry.name}`, 'err');
+        renderFileList(); return;
+      }
+
+      state.parsedJobs = state.parsedJobs.filter(j => j.fileName !== entry.name);
+      state.parsedJobs.push(parsed);
+      entry.status = 'parsed';
+      log(`✓ ${entry.name} → "${sheet}" — ${parsed.activities.length} activities, ${parsed.dates.length} date cols`, 'ok');
+
+      rebuildDates();
+      renderFileList();
+      renderPreview();
+      updateStats();
+      btnGen.disabled = false;
+    } catch(err) {
+      entry.status = 'error';
+      log(`Error parsing ${entry.name}: ${err.message}`, 'err');
+      renderFileList();
+    }
+  };
+  reader.readAsArrayBuffer(entry.file);
+}
+
+function detectSheet(wb, pref, fname) {
+  if (pref && wb.SheetNames.includes(pref)) return pref;
+  const preferOrder = [
+    s => /schedule|look.?ahead|agp|lookahead/i.test(s) && !/combined|staff|asphalt|daily/i.test(s),
+    s => /schedule/i.test(s),
+    s => true
+  ];
+  for (const pred of preferOrder) {
+    const match = wb.SheetNames.find(pred);
+    if (match) return match;
+  }
+  return wb.SheetNames[0] || null;
+}
+
+function parseLookAhead(raw, fileName, sheetName) {
+  let dateRowIdx = -1, dateColStart = -1;
+  const dates = [];
+
+  for (let r = 0; r < Math.min(15, raw.length); r++) {
+    const row = raw[r] || [];
+    const dateCols = [];
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c];
+      if (isDateVal(v)) dateCols.push({ col: c, date: parseDate(v) });
+    }
+    if (dateCols.length >= 3) {
+      dateRowIdx = r;
+      dateColStart = dateCols[0].col;
+      dateCols.forEach(d => dates.push({ col: d.col, date: d.date }));
+      break;
+    }
+  }
+  if (dateRowIdx < 0) return null;
+
+  let headerRowIdx = -1, colMap = {};
+  for (let r = Math.max(0, dateRowIdx - 2); r < Math.min(dateRowIdx + 4, raw.length); r++) {
+    const row = (raw[r] || []).map(v => String(v || '').toUpperCase().trim());
+    if (row.some(v => v === 'CREW')) {
+      headerRowIdx = r;
+      const crewColIdx = row.indexOf('CREW');
+
+      // Activity col: explicit header first, else nearest non-blank left of CREW
+      let actCol = row.findIndex(v => v === 'ACTIVITY' || v === 'DESCRIPTION' || v === 'SCOPE');
+      if (actCol < 0) {
+        for (let c = crewColIdx - 1; c >= 0; c--) {
+          if (row[c] !== '') { actCol = c; break; }
+        }
+      }
+      colMap.activityCol = actCol >= 0 ? actCol : 2;
+
+      // Crew tag: col 0 often holds SUB/blank as a crew classifier
+      const firstData = (raw[headerRowIdx + 1] || []).map(v => String(v || '').trim());
+      colMap.crewTag = (firstData[0] === '' || /^(SUB|DIR|OWN|PAR|AGT|PARAGON)$/i.test(firstData[0])) ? 0 : null;
+
+      // Named columns from header
+      row.forEach((v, c) => {
+        if (v === 'PM/GS' || v === 'PM' || v === 'GS')              colMap.pmgs = c;
+        if (v.includes('ORIGINAL') || v.includes('ORIG'))           colMap.origDue = c;
+        if (v.includes('ADDED'))                                     colMap.addedDays = c;
+        if (v.includes('ADJUSTED') || v.includes('ADJ'))            colMap.adjDue = c;
+        if (v.includes('REMAINING') || v.includes('DAYS REM'))      colMap.daysRem = c;
+        if (v === 'STATUS')                                          colMap.status = c;
+        if (v.includes('IMPACT'))                                    colMap.impact = c;
+        if (v === 'DUE DATE' || v === 'DUE')                        colMap.dueDate = c;
+        if (v === 'PUSH DATE' || v === 'PUSH')                      colMap.pushDate = c;
+      });
+
+      // STATUS fallback: col between activityCol+1 and pmgs is often status
+      // (handles sheets where the CREW label sits in what is actually the status data column)
+      if (colMap.status == null && colMap.pmgs != null && (colMap.activityCol + 1) < colMap.pmgs) {
+        colMap.status = colMap.activityCol + 1;
+      }
+
+      break;
+    }
+  }
+
+  let jobNum = '', jobName = '', headcount = null;
+  for (let r = 0; r < dateRowIdx; r++) {
+    const row = raw[r] || [];
+    for (let c = 0; c < row.length; c++) {
+      const v = String(row[c] || '');
+      if (/^\d{3,4}$/.test(v.trim())) { jobNum = v.trim(); }
+      if (v.length > 8 && !/week|date|headcount|staff|crew|job|project|look.ahead|resource/i.test(v)) {
+        if (!jobName) jobName = v.trim();
+      }
+    }
+    const rowStr = JSON.stringify(row).toLowerCase();
+    if (rowStr.includes('headcount')) {
+      const nums = row.filter(v => typeof v === 'number' || (v && /^\d+$/.test(String(v).trim())));
+      if (nums.length > 0) headcount = Number(nums[0]);
+    }
+  }
+
+  const activities = [];
+  const SKIP_KEYWORDS = /staff required|staff over|total field|total staff|total pryor|office trailer|site safety|surveying|superintendent|project manager|general super/i;
+
+  const dataStart = Math.max(headerRowIdx + 1, dateRowIdx + 1);
+  for (let r = dataStart; r < raw.length; r++) {
+    const row = raw[r] || [];
+    if (!row.some(v => v !== null && v !== '')) continue;
+    const firstVal = String(row[0] || row[1] || row[2] || '').trim();
+    if (SKIP_KEYWORDS.test(firstVal)) continue;
+
+    const activityCol = colMap.activityCol != null ? colMap.activityCol : 2;
+    const actName = String(row[activityCol] || '').trim();
+    if (!actName) continue;
+    if (SKIP_KEYWORDS.test(actName)) continue;
+
+    const dayVals = dates.map(d => {
+      const v = row[d.col];
+      if (v === null || v === undefined || v === '') return null;
+      const s = String(v).trim();
+      if (s === '' || s === ' ') return '●';
+      const n = parseFloat(s);
+      if (!isNaN(n)) return n;
+      return s;
+    });
+
+    const hasActivity = dayVals.some(v => v !== null);
+    if (!hasActivity && !actName) continue;
+
+    activities.push({
+      jobNum, jobName,
+      activity:  actName,
+      crew:      colMap.crewTag != null ? String(row[colMap.crewTag] || '').trim() : '',
+      pmgs:      colMap.pmgs    != null ? String(row[colMap.pmgs]    || '').trim() : '',
+      origDue:   colMap.origDue != null ? formatDate(row[colMap.origDue])   : '',
+      addedDays: colMap.addedDays != null ? (row[colMap.addedDays] ?? '') : '',
+      adjDue:    colMap.adjDue  != null ? formatDate(row[colMap.adjDue])    : '',
+      daysRem:   colMap.daysRem != null ? (row[colMap.daysRem] ?? '') : '',
+      status:    colMap.status  != null ? String(row[colMap.status]  || '').trim() : '',
+      impact:    colMap.impact  != null ? String(row[colMap.impact]  || '').trim() : '',
+      dueDate:   colMap.dueDate != null ? formatDate(row[colMap.dueDate])   : '',
+      pushDate:  colMap.pushDate != null ? formatDate(row[colMap.pushDate]) : '',
+      dayVals,
+    });
+  }
+
+  return { jobNum, jobName, sheetName, fileName, activities, dates, headcount };
+}
+
+function rebuildDates() {
+  const dateMap = new Map();
+  state.parsedJobs.forEach(job => {
+    job.dates.forEach(d => {
+      const key = d.date ? d.date.toISOString().slice(0,10) : null;
+      if (key) dateMap.set(key, d.date);
+    });
+  });
+  state.allDates = [...dateMap.entries()]
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([,d]) => d);
+}
+
+// ══════════════════════════════════════════════════════
+//  RENDER UI
+// ══════════════════════════════════════════════════════
+function renderFileList() {
+  if (state.files.length === 0) {
+    fileList.innerHTML = '<div style="font-size:11px;color:var(--gray);font-style:italic;padding:4px 2px">No files loaded yet</div>';
+    return;
+  }
+  fileList.innerHTML = state.files.map(f => `
+    <div class="file-item">
+      <span class="fi-name" title="${f.name}">${f.name}</span>
+      <span class="fi-status ${f.status}">${f.status}</span>
+      <button class="fi-remove" onclick="removeFile('${f.name.replace(/'/g,"\\'")}')">✕</button>
+    </div>`).join('');
+}
+
+function updateStats() {
+  const jobs = state.parsedJobs;
+  statFiles.textContent = state.files.filter(f => f.status === 'parsed').length;
+  statJobs.textContent  = jobs.length;
+  statActs.textContent  = jobs.reduce((s,j) => s + j.activities.length, 0);
+  const wks = state.allDates.length > 0
+    ? Math.ceil((state.allDates[state.allDates.length-1] - state.allDates[0]) / (7*86400000)) + 1
+    : 0;
+  statWeeks.textContent = wks;
+}
+
+function renderPreview() {
+  if (state.parsedJobs.length === 0) {
+    tableWrap.innerHTML = `<div class="empty-state"><div class="es-icon">📋</div><p>Load field look-ahead files to preview<br>the combined roll-up here.</p></div>`;
+    return;
+  }
+  state.activeTab === 'flat' ? renderFlat() : renderByJob();
+}
+
+function renderFlat() {
+  const cols = fixedCols();
+  let html = '<table><thead><tr>';
+  cols.forEach(c => html += `<th>${c.label}</th>`);
+  state.allDates.forEach(d => html += `<th class="date-col">${fmtDateShort(d)}</th>`);
+  html += '</tr></thead><tbody>';
+
+  const allRows = [];
+  state.parsedJobs.forEach(job => job.activities.forEach(act => allRows.push({ job, act })));
+  allRows.sort((a,b) => String(a.job.jobNum).localeCompare(String(b.job.jobNum)) || a.act.activity.localeCompare(b.act.activity));
+
+  allRows.forEach(({job, act}) => {
+    html += '<tr>';
+    cols.forEach(c => html += `<td${c.cls?' class="'+c.cls+'"':''}>${c.get(job,act)}</td>`);
+    state.allDates.forEach(d => {
+      const key = d.toISOString().slice(0,10);
+      const di = job.dates.findIndex(jd => jd.date && jd.date.toISOString().slice(0,10) === key);
+      const v = di >= 0 ? act.dayVals[di] : null;
+      html += dayCell(v);
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  tableWrap.innerHTML = html;
+}
+
+function renderByJob() {
+  const cols = fixedCols();
+  let html = '<table><thead><tr>';
+  cols.forEach(c => html += `<th>${c.label}</th>`);
+  state.allDates.forEach(d => html += `<th class="date-col">${fmtDateShort(d)}</th>`);
+  html += '</tr></thead><tbody>';
+
+  state.parsedJobs.forEach(job => {
+    const span = cols.length + state.allDates.length;
+    html += `<tr class="section-header"><td colspan="${span}">Job ${job.jobNum} — ${job.jobName} &nbsp;<small style="color:var(--gray-dk);font-weight:400;font-size:10px">${job.fileName}</small></td></tr>`;
+
+    const dayTotals = new Array(state.allDates.length).fill(0);
+    job.activities.forEach(act => {
+      html += '<tr>';
+      cols.forEach(c => html += `<td${c.cls?' class="'+c.cls+'"':''}>${c.get(job,act)}</td>`);
+      state.allDates.forEach((d, i) => {
+        const key = d.toISOString().slice(0,10);
+        const di = job.dates.findIndex(jd => jd.date && jd.date.toISOString().slice(0,10) === key);
+        const v = di >= 0 ? act.dayVals[di] : null;
+        if (typeof v === 'number') dayTotals[i] += v;
+        html += dayCell(v);
+      });
+      html += '</tr>';
+    });
+
+    html += '<tr class="summary-row-tr">';
+    cols.forEach((c, ci) => html += `<td>${ci === 0 ? 'Staff Required' : ''}</td>`);
+    dayTotals.forEach(n => html += `<td class="num-val">${n > 0 ? n : ''}</td>`);
+    html += '</tr>';
+
+    const hc = job.headcount || 0;
+    html += '<tr class="summary-row-tr">';
+    cols.forEach((c, ci) => html += `<td>${ci === 0 ? 'Staff Over/Under' : ''}</td>`);
+    dayTotals.forEach(n => {
+      if (n === 0) { html += '<td></td>'; return; }
+      const diff = hc - n;
+      const cls = diff >= 0 ? 'pos-val' : 'neg-val';
+      html += `<td class="${cls}">${diff >= 0 ? '+' : ''}${diff}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  tableWrap.innerHTML = html;
+}
+
+function fixedCols() {
+  return [
+    { label: 'Job #',     cls: '',         get: (j,a) => `<span class="job-tag">${j.jobNum}</span>` },
+    { label: 'Activity',  cls: '',         get: (j,a) => a.activity },
+    { label: 'Crew',      cls: '',         get: (j,a) => a.crew },
+    { label: 'PM/GS',     cls: '',         get: (j,a) => a.pmgs },
+    { label: 'Orig Due',  cls: 'date-val', get: (j,a) => a.origDue },
+    { label: '+Days',     cls: 'num-val',  get: (j,a) => a.addedDays },
+    { label: 'Adj Due',   cls: 'date-val', get: (j,a) => a.adjDue },
+    { label: 'Days Rem',  cls: 'num-val',  get: (j,a) => a.daysRem },
+    { label: 'Status',    cls: '',         get: (j,a) => a.status },
+    { label: 'Impact',    cls: '',         get: (j,a) => a.impact },
+  ];
+}
+
+function dayCell(v) {
+  if (v === null || v === undefined) return '<td></td>';
+  if (v === '●') return '<td class="sched-dot">●</td>';
+  if (typeof v === 'number') return `<td class="num-val">${v}</td>`;
+  return `<td class="date-val">${v}</td>`;
+}
+
+// ══════════════════════════════════════════════════════
+//  GENERATE EXCEL
+// ══════════════════════════════════════════════════════
+btnGen.addEventListener('click', generateExcel);
+
+function generateExcel() {
+  if (state.parsedJobs.length === 0) return;
+  const wb = XLSX.utils.book_new();
+  buildFlatSheet(wb);
+  buildByJobSheet(wb);
+  const fname = (document.getElementById('optFilename').value.trim() || 'Paragon_LookAhead_Rollup')
+    .replace(/\.xlsx$/i, '') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  log(`✓ Downloaded: ${fname}`, 'ok');
+}
+
+function sharedHeaders() {
+  return ['Job #', 'Job Name', 'Activity', 'Crew', 'PM/GS',
+          'Orig Due', '+Days', 'Adj Due', 'Days Rem', 'Status', 'Impact'];
+}
+
+function buildFlatSheet(wb) {
+  const fixed = sharedHeaders();
+  const dateLbls = state.allDates.map(d => fmtDateShort(d));
+  const headerRow = [...fixed, ...dateLbls];
+  const rows = [headerRow];
+
+  const allRows = [];
+  state.parsedJobs.forEach(job => job.activities.forEach(act => allRows.push({job,act})));
+  allRows.sort((a,b) => String(a.job.jobNum).localeCompare(String(b.job.jobNum)));
+
+  allRows.forEach(({job, act}) => {
+    rows.push([
+      job.jobNum, job.jobName, act.activity, act.crew, act.pmgs,
+      act.origDue, act.addedDays !== '' ? Number(act.addedDays)||act.addedDays : '',
+      act.adjDue,
+      act.daysRem !== '' ? Number(act.daysRem)||act.daysRem : '',
+      act.status, act.impact,
+      ...mapDays(job, act)
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applySheetStyle(ws, rows.length, headerRow.length);
+  XLSX.utils.book_append_sheet(wb, ws, 'Roll-Up (Flat)');
+}
+
+function buildByJobSheet(wb) {
+  const fixed = sharedHeaders();
+  const dateLbls = state.allDates.map(d => fmtDateShort(d));
+  const headerRow = [...fixed, ...dateLbls];
+  const rows = [headerRow];
+
+  state.parsedJobs.forEach(job => {
+    const secRow = new Array(headerRow.length).fill('');
+    secRow[0] = `Job ${job.jobNum} — ${job.jobName}`;
+    rows.push(secRow);
+
+    const dayTotals = new Array(state.allDates.length).fill(0);
+
+    job.activities.forEach(act => {
+      const dayMapped = mapDays(job, act);
+      dayMapped.forEach((v, i) => { if (typeof v === 'number') dayTotals[i] += v; });
+      rows.push([
+        job.jobNum, job.jobName, act.activity, act.crew, act.pmgs,
+        act.origDue, act.addedDays !== '' ? Number(act.addedDays)||act.addedDays : '',
+        act.adjDue,
+        act.daysRem !== '' ? Number(act.daysRem)||act.daysRem : '',
+        act.status, act.impact,
+        ...dayMapped
+      ]);
+    });
+
+    const reqRow = new Array(headerRow.length).fill('');
+    reqRow[0] = 'Staff Required';
+    dayTotals.forEach((n,i) => { if (n > 0) reqRow[fixed.length + i] = n; });
+    rows.push(reqRow);
+
+    const hc = job.headcount || 0;
+    const ouRow = new Array(headerRow.length).fill('');
+    ouRow[0] = 'Staff Over / Under';
+    dayTotals.forEach((n, i) => { if (n > 0) ouRow[fixed.length + i] = hc - n; });
+    rows.push(ouRow);
+
+    rows.push(new Array(headerRow.length).fill(''));
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applySheetStyle(ws, rows.length, headerRow.length);
+  XLSX.utils.book_append_sheet(wb, ws, 'Roll-Up (By Job)');
+}
+
+function mapDays(job, act) {
+  return state.allDates.map(d => {
+    const key = d.toISOString().slice(0,10);
+    const di = job.dates.findIndex(jd => jd.date && jd.date.toISOString().slice(0,10) === key);
+    if (di < 0) return '';
+    const v = act.dayVals[di];
+    if (v === null || v === undefined) return '';
+    if (v === '●') return '●';
+    return v;
+  });
+}
+
+function applySheetStyle(ws, nRows, nCols) {
+  const fixedWidths = [8, 22, 36, 12, 10, 10, 6, 10, 8, 10, 8];
+  const colInfo = [];
+  fixedWidths.forEach(w => colInfo.push({ wch: w }));
+  const dateCols = nCols - fixedWidths.length;
+  for (let i = 0; i < dateCols; i++) colInfo.push({ wch: 6 });
+  ws['!cols'] = colInfo;
+  ws['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft' };
+}
+
+// ══════════════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════════════
+function isDateVal(v) {
+  if (!v) return false;
+  if (v instanceof Date) return !isNaN(v);
+  const s = String(v).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s);
+}
+
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  const s = String(v).trim();
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function formatDate(v) {
+  if (!v) return '';
+  const d = parseDate(v);
+  if (!d) return String(v);
+  return d.toLocaleDateString('en-US', { month:'numeric', day:'numeric', year:'2-digit' });
+}
+
+function fmtDateShort(d) {
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', { month:'numeric', day:'numeric' });
+}
+
+// ══════════════════════════════════════════════════════
+//  CLOUD LOAD
+// ══════════════════════════════════════════════════════
+(function initCloud() {
+  const cloudWeekInput = document.getElementById('cloudWeek');
+  const btnCloud       = document.getElementById('btnCloud');
+
+  // Default to next Monday
+  function nextMonday(from = new Date()) {
+    const d = new Date(from);
+    const day = d.getDay(); // 0=Sun,1=Mon...
+    const diff = day === 0 ? 1 : (8 - day) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  function toIso(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Lock any picked date to its Monday
+  function toMonday(isoStr) {
+    const d = new Date(isoStr + 'T12:00:00');
+    const day = d.getDay();
+    if (day === 1) return d;
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  cloudWeekInput.value = toIso(nextMonday());
+
+  cloudWeekInput.addEventListener('change', () => {
+    const mon = toMonday(cloudWeekInput.value);
+    cloudWeekInput.value = toIso(mon);
+  });
+
+  btnCloud.addEventListener('click', loadFromCloud);
+
+  async function loadFromCloud() {
+    const weekIso = cloudWeekInput.value;
+    if (!weekIso) { log('Select a week first.', 'warn'); return; }
+    btnCloud.disabled = true;
+    btnCloud.textContent = '⏳ Loading…';
+    log(`Fetching cloud data for week ${weekIso}…`);
+    try {
+      const res = await fetch(`/api/blobs?week=${weekIso}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data.rows || []);
+      if (rows.length === 0) {
+        log(`No cloud data found for week ${weekIso}.`, 'warn');
+        return;
+      }
+      const jobs = mapBlobToJobs(rows, weekIso);
+      jobs.forEach(j => {
+        state.parsedJobs = state.parsedJobs.filter(p => !(p.jobNum === j.jobNum && p.sheetName === j.sheetName));
+        state.parsedJobs.push(j);
+      });
+      rebuildDates();
+      renderPreview();
+      updateStats();
+      btnGen.disabled = false;
+      log(`☁ Loaded ${jobs.length} job(s) from cloud for week ${weekIso}.`, 'ok');
+    } catch(err) {
+      log(`Cloud load failed: ${err.message}`, 'error');
+    } finally {
+      btnCloud.disabled = false;
+      btnCloud.textContent = '☁ Load All Supers';
+    }
+  }
+
+  function mapBlobToJobs(rows, mondayIso) {
+    // Build 15 workday dates: Mon-Fri × 3 weeks from mondayIso
+    const mon = new Date(mondayIso + 'T12:00:00');
+    const workdayDates = [];
+    for (let w = 0; w < 3; w++) {
+      for (let d = 0; d < 5; d++) {
+        const dt = new Date(mon);
+        dt.setDate(mon.getDate() + w * 7 + d);
+        workdayDates.push(dt);
+      }
+    }
+    const dates = workdayDates.map((dt, i) => ({ col: i, date: dt }));
+
+    // Group rows by jobRef so each job becomes one parsedJob
+    const byJob = new Map();
+    rows.forEach(row => {
+      const key = row.jn || row.jobRef || 'Unknown';
+      if (!byJob.has(key)) byJob.set(key, []);
+      byJob.get(key).push(row);
+    });
+
+    const jobs = [];
+    byJob.forEach((jobRows, jn) => {
+      const first = jobRows[0];
+      const jobName = first.pn || first.jobRef || jn;
+      const activities = jobRows.map(row => ({
+        jobNum:   jn,
+        jobName:  jobName,
+        activity: row.sec ? `${row.sec.toUpperCase()} — ${row.crew || ''}` : (row.crew || 'Unknown'),
+        crew:     row.crew || '',
+        pmgs:     '',
+        origDue:  null,
+        addedDays: 0,
+        adjDue:   null,
+        daysRem:  null,
+        status:   '',
+        impact:   '',
+        dayVals:  Array.isArray(row.days) ? row.days.slice(0, 15) : new Array(15).fill(0)
+      }));
+      jobs.push({
+        jobNum:    jn,
+        jobName:   jobName,
+        sheetName: `cloud-${mondayIso}`,
+        fileName:  `☁ Cloud ${mondayIso}`,
+        activities,
+        dates,
+        headcount: {}
+      });
+    });
+    return jobs;
+  }
+})();
+
+function log(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = `log-${type}`;
+  el.textContent = msg;
+  if (logArea.firstChild && logArea.firstChild.style && logArea.firstChild.style.color === 'var(--gray)') {
+    logArea.innerHTML = '';
+  }
+  logArea.appendChild(el);
+  logArea.scrollTop = logArea.scrollHeight;
+}
+</script>
+</body>
+</html>
