@@ -177,6 +177,7 @@ td.del-cell{width:22px;text-align:center;padding:1px}
 
 /* col widths */
 .w-job{width:42px}.w-proj{width:180px}.w-crew{width:78px}
+.crew-unassigned input{background:#FFF9C4!important;border-color:#F59E0B!important;color:#92600A!important}
 .w-pm{width:72px}.w-odue{width:78px}.w-add{width:42px}
 .w-adue{width:78px}.w-drem{width:42px}.w-stat{width:48px}.w-imp{width:42px}
 
@@ -258,7 +259,7 @@ td.del-cell{width:22px;text-align:center;padding:1px}
   <button class="btn btn-save" onclick="saveData()">☁ Save My Rows</button>
   <button class="btn btn-load" onclick="loadData()">📂 Load My Rows</button>
   <button class="btn btn-focus" id="focusToggle" onclick="toggleFocusMode()">👁 My Jobs Only</button>
-  <button class="btn btn-export" onclick="exportExcel()">⬇ Export Excel</button>
+  <button class="btn btn-export" onclick="exportExcel()">⬇ Export Draft</button>
   <button class="btn btn-print" onclick="window.print()">🖨 Print</button>
 </div>
 
@@ -486,7 +487,7 @@ function buildThead(sec, dates){
   capCells += `<td class="info-cell"></td><td></td>`;
 
   // Column header row
-  const cols = ['#','PROJECT NAME','CREW','PM / GS','ORIG DUE','ADD DAYS','ADJ DUE','DAYS REM','STATUS','IMPACT'];
+  const cols = ['#','PROJECT NAME','FOREMAN','PM / GS','ORIG DUE','ADD DAYS','ADJ DUE','DAYS REM','STATUS','IMPACT'];
   let colHdrCells = cols.map((c,i) => {
     const cls = ['w-job s0','w-proj s1','w-crew','w-pm','w-odue','w-add','w-adue','w-drem','w-stat','w-imp'][i] || '';
     return `<th class="info-cell ${cls}">${c}</th>`;
@@ -542,10 +543,11 @@ function buildJobRow(sec, job, jIdx){
   const adj = adjDueDate(job.od, job.ad);
   const rem = daysRemaining(adj, state.weekOf);
 
+  const crewBlank = !job.crew || !job.crew.trim();
   const infoCells = [
     {v:job.jn, k:'jn', cls:'w-job s0', type:'text'},
     {v:job.pn, k:'pn', cls:'w-proj s1', type:'text'},
-    {v:job.crew, k:'crew', cls:'w-crew', type:'text'},
+    {v:job.crew, k:'crew', cls:'w-crew'+(crewBlank?' crew-unassigned':''), type:'text', ph:'PM to schedule'},
     {v:job.pm, k:'pm', cls:'w-pm', type:'text'},
     {v:job.od, k:'od', cls:'w-odue', type:'text', ph:'MM/DD/YYYY'},
     {v:job.ad, k:'ad', cls:'w-add', type:'number'},
@@ -968,7 +970,7 @@ function exportExcel(){
 
   // Title
   html += `<table><tr><td colspan="27" class="navy" style="font-size:11pt;padding:5px 8px;">
-    LOOK AHEAD RESOURCE REPORT — ${weekLabel}</td></tr></table><br/>`;
+    SUPERINTENDENT DRAFT — ${weekLabel} — NOT OFFICIAL</td></tr></table><br/>`;
 
   state.sections.forEach(sec => {
     const cap = sec.capacity;
@@ -1057,7 +1059,7 @@ function exportExcel(){
   const a = document.createElement('a');
   const wo = state.weekOf ? state.weekOf.replace(/-/g,'') : 'NoDate';
   a.href = url;
-  a.download = `Paragon_LookAhead_${wo}.xls`;
+  a.download = `SuperDraft_LookAhead_${wo}.xls`;
   a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 5000);
   toast('Excel file downloaded.');

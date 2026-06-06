@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Paragon — Crew Schedule Entry</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#29166F;--navy2:#3d22a0;
+  --green:#85C227;--green-dk:#6aa01e;--green-lt:#f3f9e8;
+  --bg:#F3F7EB;--white:#fff;
+  --gray:#B9BEB7;--gray-lt:#e8ecea;--gray-dk:#6b7280;
+  --text:#1a1a2e;--text-sub:#4b5563;
+  --red:#c0392b;--amber:#d97706;
+  --radius:8px;
+  --shadow:0 2px 12px rgba(41,22,111,.10);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+
+/* HEADER */
+header{background:var(--navy);padding:0 16px;display:flex;align-items:center;gap:12px;height:52px;box-shadow:0 2px 8px rgba(41,22,111,.3)}
+.logo-mark{width:30px;height:30px;background:var(--green);clip-path:polygon(0 0,100% 0,100% 68%,68% 100%,0 100%);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--navy);flex-shrink:0}
+header h1{font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#fff}
+header .sub{font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.5px;text-transform:uppercase}
+
+/* SETUP CARD */
+.setup-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin:16px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.setup-card label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--navy);display:block;margin-bottom:4px}
+.setup-card select,.setup-card input[type=date]{
+  width:100%;border:1.5px solid var(--gray-lt);border-radius:var(--radius);
+  padding:10px 12px;font-size:15px;font-family:inherit;color:var(--text);
+  background:var(--bg);appearance:none;
+}
+.setup-card select:focus,.setup-card input[type=date]:focus{outline:none;border-color:var(--navy)}
+.week-display{font-size:13px;color:var(--gray-dk);margin-top:2px}
+
+/* JOBS */
+#jobs-area{margin:0 16px 16px;display:flex;flex-direction:column;gap:12px}
+.job-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.job-header{background:var(--navy);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px}
+.job-disc{background:var(--green);color:var(--navy);font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.job-name{font-size:13px;font-weight:600;flex:1}
+.job-num{font-size:11px;opacity:.6;font-family:monospace}
+.no-assign{background:#fff3cd;border-left:3px solid var(--amber);padding:6px 10px;font-size:11px;color:var(--amber);font-weight:600}
+
+/* DAY GRID */
+.day-grid{padding:12px 14px}
+.week-label{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--gray-dk);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--gray-lt)}
+.days-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.day-cell{display:flex;flex-direction:column;align-items:center;gap:3px}
+.day-lbl{font-size:10px;color:var(--gray-dk);font-weight:600;text-align:center}
+.day-date{font-size:9px;color:var(--gray);text-align:center}
+.day-input{
+  width:100%;border:1.5px solid var(--gray-lt);border-radius:6px;
+  padding:8px 4px;font-size:16px;text-align:center;font-family:inherit;
+  color:var(--text);background:var(--bg);
+}
+.day-input:focus{outline:none;border-color:var(--navy);background:#fff}
+.day-input.has-val{background:var(--green-lt);border-color:var(--green-dk);font-weight:700}
+.day-input.is-off{background:var(--gray-lt);color:var(--gray)}
+
+/* NOTES */
+.notes-row{padding:0 14px 12px}
+.notes-row textarea{
+  width:100%;border:1.5px solid var(--gray-lt);border-radius:6px;
+  padding:8px 10px;font-size:13px;font-family:inherit;color:var(--text);
+  background:var(--bg);resize:none;height:56px;
+}
+.notes-row textarea:focus{outline:none;border-color:var(--navy)}
+.notes-label{font-size:10px;font-weight:700;color:var(--gray-dk);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+
+/* FOOTER BUTTONS */
+.footer{position:sticky;bottom:0;background:var(--white);border-top:1px solid var(--gray-lt);padding:12px 16px;display:flex;gap:8px;z-index:100}
+.btn-save{flex:1;background:var(--green);color:var(--navy);border:none;border-radius:var(--radius);padding:13px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:background .15s}
+.btn-save:hover{background:var(--green-dk)}
+.btn-save:disabled{background:var(--gray);cursor:default;color:#fff}
+.btn-ref{background:var(--bg);color:var(--navy);border:1.5px solid var(--navy);border-radius:var(--radius);padding:13px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn-ref:hover{background:var(--navy);color:#fff}
+
+/* TOAST */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;white-space:nowrap}
+#toast.show{opacity:1}
+
+/* SAVED BAR */
+#saved-bar{position:fixed;top:52px;left:0;right:0;background:var(--green);color:var(--navy);text-align:center;font-size:13px;font-weight:700;padding:8px;transform:translateY(-100%);transition:transform .3s;z-index:200}
+#saved-bar.show{transform:translateY(0)}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:48px 24px;color:var(--gray-dk)}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.empty-state p{font-size:14px;line-height:1.6}
+
+@media(max-width:400px){
+  .day-input{font-size:18px;padding:10px 2px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">P</div>
+  <div>
+    <h1>Crew Schedule</h1>
+    <div class="sub">Field Entry — Week Plan</div>
+  </div>
+</header>
+
+<div id="saved-bar">✓ Saved to paragontulsaresults.com</div>
+
+<div class="setup-card">
+  <div>
+    <label>Your Name</label>
+    <select id="crewName" onchange="onNameChange(this.value)">
+      <option value="">— tap to select —</option>
+      <option value="jared">Jared</option>
+      <option value="rolondo">Rolondo</option>
+      <option value="elijah">Elijah</option>
+      <option value="john">John</option>
+      <option value="jimmy">Jimmy</option>
+      <option value="randy">Randy</option>
+      <option value="sergio">Sergio</option>
+      <option value="anthony">Anthony</option>
+      <option value="rye">Rye</option>
+      <option value="miller">Miller</option>
+    </select>
+  </div>
+  <div>
+    <label>Week Of</label>
+    <div id="week-display" class="week-display">Loading…</div>
+  </div>
+</div>
+
+<div id="jobs-area">
+  <div class="empty-state">
+    <div class="icon">👷</div>
+    <p>Select your name above<br>to see your jobs for the week.</p>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn-save" id="btnSave" onclick="saveRows()" disabled>☁ Save My Plan</button>
+  <button class="btn-ref" onclick="exportRef()">⬇ My Copy</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── DATA ────────────────────────────────────────────────────────────────────
+const DISC_LABEL = { site:'Site', util:'Utility', conc:'Concrete', asph:'Asphalt' };
+
+// Crew → their jobs (discipline + job details)
+const CREW_JOBS = {
+  jared:   [
+    {disc:'site', jn:'565', pn:'Jenks-Elm Street'},
+    {disc:'site', jn:'580', pn:'Jenks-Elm Street (Phase 2)'},
+    {disc:'asph', jn:'565', pn:'Jenks-Elm Street'},
+  ],
+  rolondo: [
+    {disc:'site', jn:'571', pn:'BA – Jasper/Aspen'},
+  ],
+  elijah:  [
+    {disc:'site', jn:'575', pn:'SGL Airport'},
+  ],
+  john:    [
+    {disc:'site', jn:'574', pn:'COT 91st Street'},
+    {disc:'util', jn:'564', pn:'MCC 24" Tie-In'},
+    {disc:'util', jn:'574', pn:'COT 91st Street'},
+  ],
+  jimmy:   [
+    {disc:'site', jn:'577', pn:'Kirby-Smith Yard'},
+  ],
+  sergio:  [
+    {disc:'util', jn:'566', pn:'COT Woodward Park'},
+  ],
+  anthony: [
+    {disc:'util', jn:'565', pn:'Jenks-Elm Street (Storm)'},
+  ],
+  randy:   [
+    {disc:'conc', jn:'565', pn:'Jenks-Elm Street'},
+    {disc:'conc', jn:'571', pn:'BA – Jasper/Aspen'},
+    {disc:'conc', jn:'',   pn:'Muskogee Ave Punch List'},
+    {disc:'conc', jn:'',   pn:'SGL Airport'},
+  ],
+  miller:  [
+    {disc:'conc', jn:'566', pn:'COT Woodward Park'},
+  ],
+  rye:     [
+    {disc:'asph', jn:'571', pn:'BA – Jasper/Aspen'},
+    {disc:'asph', jn:'573', pn:'Averitt'},
+    {disc:'asph', jn:'',   pn:'Berryhill – Sand Springs'},
+    {disc:'asph', jn:'565', pn:'Jenks-Elm Street'},
+  ],
+};
+
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri'];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let state = {
+  name: '',
+  weekIso: '',
+  // rows: { key: { disc, jn, pn, days:[5 values], notes } }
+  rows: {}
+};
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+(function init(){
+  // Restore from localStorage
+  try{
+    const saved = JSON.parse(localStorage.getItem('paragon_crew') || '{}');
+    if(saved.name)    state.name    = saved.name;
+    if(saved.weekIso) state.weekIso = saved.weekIso;
+  }catch(e){}
+
+  // Default week = next Monday
+  if(!state.weekIso) state.weekIso = nextMonday();
+
+  showWeek();
+
+  if(state.name){
+    document.getElementById('crewName').value = state.name;
+    loadAndRender();
+  }
+})();
+
+function nextMonday(from = new Date()){
+  const d = new Date(from);
+  const day = d.getDay();
+  const diff = day === 0 ? 1 : (8 - day) % 7 || 7;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0,10);
+}
+
+function showWeek(){
+  const d = new Date(state.weekIso + 'T12:00:00');
+  document.getElementById('week-display').textContent =
+    'Week of ' + d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+
+function weekDates(){
+  const mon = new Date(state.weekIso + 'T12:00:00');
+  return [0,1,2,3,4].map(i => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d;
+  });
+}
+
+// ── NAME CHANGE ──────────────────────────────────────────────────────────────
+function onNameChange(val){
+  state.name = val;
+  state.rows = {};
+  persist();
+  if(val) loadAndRender();
+  else renderEmpty();
+  document.getElementById('btnSave').disabled = !val;
+}
+
+async function loadAndRender(){
+  if(!state.name || !state.weekIso) return;
+  // Try to load existing crew entry from cloud
+  try{
+    const res = await fetch(`/api/blobs?week=${state.weekIso}&super=${state.name}&store=crew`);
+    if(res.ok){
+      const data = await res.json();
+      if(data.rows && data.rows.length){
+        data.rows.forEach(r => {
+          const k = r.disc + '|' + r.jn + '|' + r.pn;
+          state.rows[k] = { disc:r.disc, jn:r.jn, pn:r.pn, days:r.days||Array(5).fill(''), notes:r.notes||'' };
+        });
+      }
+    }
+  }catch(e){ /* offline or no data — that's fine */ }
+  render();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  const area   = document.getElementById('jobs-area');
+  const dates  = weekDates();
+  const jobs   = CREW_JOBS[state.name] || [];
+
+  if(!jobs.length){
+    area.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>No jobs found for this name.<br>Ask your super to add you.</p></div>`;
+    return;
+  }
+
+  area.innerHTML = jobs.map(job => {
+    const k   = job.disc + '|' + job.jn + '|' + job.pn;
+    const row = state.rows[k] || { days: Array(5).fill(''), notes: '' };
+
+    const dayCells = dates.map((dt, i) => {
+      const v   = row.days[i] || '';
+      const cls = v ? 'day-input has-val' : 'day-input';
+      return `<div class="day-cell">
+        <div class="day-lbl">${DAY_NAMES[i]}</div>
+        <div class="day-date">${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})}</div>
+        <input class="${cls}" type="number" min="0" max="99" value="${v}"
+          inputmode="numeric" data-key="${k}" data-day="${i}"
+          oninput="onDayInput(this)" />
+      </div>`;
+    }).join('');
+
+    return `<div class="job-card">
+      <div class="job-header">
+        <span class="job-disc">${DISC_LABEL[job.disc]||job.disc}</span>
+        <span class="job-name">${job.pn}</span>
+        ${job.jn ? `<span class="job-num">#${job.jn}</span>` : ''}
+      </div>
+      <div class="day-grid">
+        <div class="week-label">Headcount — Mon through Fri</div>
+        <div class="days-row">${dayCells}</div>
+      </div>
+      <div class="notes-row">
+        <div class="notes-label">Notes / Issues</div>
+        <textarea placeholder="Any delays, equipment needs, or flags…" data-key="${k}"
+          oninput="onNotes(this)">${row.notes||''}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderEmpty(){
+  document.getElementById('jobs-area').innerHTML = `<div class="empty-state"><div class="icon">👷</div><p>Select your name above<br>to see your jobs for the week.</p></div>`;
+}
+
+// ── INPUT HANDLERS ───────────────────────────────────────────────────────────
+function onDayInput(el){
+  const k   = el.dataset.key;
+  const day = parseInt(el.dataset.day);
+  if(!state.rows[k]) state.rows[k] = { days: Array(5).fill(''), notes: '' };
+  state.rows[k].days[day] = el.value;
+  el.className = el.value ? 'day-input has-val' : 'day-input';
+}
+
+function onNotes(el){
+  const k = el.dataset.key;
+  if(!state.rows[k]) state.rows[k] = { days: Array(5).fill(''), notes: '' };
+  state.rows[k].notes = el.value;
+}
+
+// ── SAVE ─────────────────────────────────────────────────────────────────────
+async function saveRows(){
+  if(!state.name){ toast('Select your name first.'); return; }
+  const jobs  = CREW_JOBS[state.name] || [];
+  const rows  = jobs.map(job => {
+    const k   = job.disc + '|' + job.jn + '|' + job.pn;
+    const row = state.rows[k] || { days: Array(5).fill(''), notes: '' };
+    return { disc:job.disc, jn:job.jn, pn:job.pn, name:state.name, days:row.days, notes:row.notes };
+  });
+
+  document.getElementById('btnSave').disabled = true;
+  try{
+    const res = await fetch('/api/blobs', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ week:state.weekIso, super:state.name, rows, store:'crew' })
+    });
+    const data = await res.json();
+    if(data.ok){
+      const bar = document.getElementById('saved-bar');
+      bar.classList.add('show');
+      setTimeout(() => bar.classList.remove('show'), 3500);
+      persist();
+    } else {
+      toast('Save failed: ' + (data.error || 'unknown'));
+    }
+  }catch(e){
+    toast('Save failed — check connection');
+  }finally{
+    document.getElementById('btnSave').disabled = false;
+  }
+}
+
+// ── REFERENCE EXPORT ─────────────────────────────────────────────────────────
+function exportRef(){
+  if(!state.name){ toast('Select your name first.'); return; }
+  const dates = weekDates();
+  const jobs  = CREW_JOBS[state.name] || [];
+  const weekLabel = new Date(state.weekIso+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+  const name  = state.name.charAt(0).toUpperCase()+state.name.slice(1);
+
+  let rows = '';
+  jobs.forEach(job => {
+    const k   = job.disc + '|' + job.jn + '|' + job.pn;
+    const row = state.rows[k] || { days:Array(5).fill(''), notes:'' };
+    const dayCells = dates.map((_,i) => `<td style="text-align:center;padding:6px 10px;border:1px solid #ccc">${row.days[i]||''}</td>`).join('');
+    rows += `<tr>
+      <td style="padding:6px 10px;border:1px solid #ccc;font-size:11px;color:#666">${DISC_LABEL[job.disc]||job.disc}</td>
+      <td style="padding:6px 10px;border:1px solid #ccc">${job.jn||''}</td>
+      <td style="padding:6px 10px;border:1px solid #ccc">${job.pn}</td>
+      ${dayCells}
+      <td style="padding:6px 10px;border:1px solid #ccc;font-size:11px;color:#555">${row.notes||''}</td>
+    </tr>`;
+  });
+
+  const dayHeaders = dates.map(d =>
+    `<th style="padding:6px 10px;border:1px solid #888;background:#1F3864;color:#fff">${DAY_NAMES[dates.indexOf(d)]}<br><small>${d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})}</small></th>`
+  ).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Crew Plan — ${name}</title></head><body style="font-family:Arial,sans-serif;padding:24px">
+    <div style="background:#FFF3CD;border:2px solid #F59E0B;padding:10px 16px;margin-bottom:16px;border-radius:6px;font-weight:700;color:#92600A;text-align:center;letter-spacing:1px">
+      FIELD REFERENCE ONLY — NOT OFFICIAL — Subject to Change by Superintendent or Management
+    </div>
+    <h2 style="color:#29166F;margin-bottom:4px">Paragon Contractors — Crew Schedule</h2>
+    <p style="color:#666;margin-bottom:16px">Week of ${weekLabel} &nbsp;|&nbsp; ${name} &nbsp;|&nbsp; Printed ${new Date().toLocaleString()}</p>
+    <table style="border-collapse:collapse;width:100%">
+      <thead><tr>
+        <th style="padding:6px 10px;border:1px solid #888;background:#1F3864;color:#fff">Discipline</th>
+        <th style="padding:6px 10px;border:1px solid #888;background:#1F3864;color:#fff">Job #</th>
+        <th style="padding:6px 10px;border:1px solid #888;background:#1F3864;color:#fff">Project</th>
+        ${dayHeaders}
+        <th style="padding:6px 10px;border:1px solid #888;background:#1F3864;color:#fff">Notes</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </body></html>`;
+
+  const blob = new Blob([html], {type:'application/vnd.ms-excel'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `CrewPlan_${name}_${state.weekIso}.xls`;
+  a.click();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function persist(){
+  localStorage.setItem('paragon_crew', JSON.stringify({name:state.name, weekIso:state.weekIso}));
+}
+
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
