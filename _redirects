@@ -1,6 +1,3 @@
 /  /wip  302
-/field-entry  /lookaheadsandbox  302
-/field  /lookaheadsandbox  302
-/crew-schedule  /crew-schedule  200
-/crew  /crew-schedule  200
-/lookahead  /lookahead_rollup_v2  302
+/field  /field-entry  302
+/crew  /crew-schedule  302
